@@ -20,7 +20,7 @@ async function googleTranscribe(input:z.infer<typeof payload>){
       {inlineData:{data:input.audio,mimeType:input.mime==='audio/mp4'?'audio/m4a':input.mime}},
       {text:TRANSCRIPTION_PROMPT},
     ]}],
-    config:{httpOptions:{timeout,retryOptions:{attempts:1}},responseMimeType:'application/json',responseJsonSchema:z.toJSONSchema(output)},
+    config:{httpOptions:{timeout,retryOptions:{attempts:1}},responseMimeType:'application/json',responseJsonSchema:z.toJSONSchema(output),temperature:0,candidateCount:1,maxOutputTokens:2048},
   }),process.env.GEMINI_TRANSCRIPTION_MODEL);
   return output.parse(JSON.parse(result.text??'{}'));
 }

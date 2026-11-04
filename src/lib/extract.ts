@@ -7,6 +7,8 @@ const zone='Asia/Kolkata';
 export function parseIST(phrase: string, now=new Date()): string | null {
   const lower=phrase.toLowerCase();
   const base=DateTime.fromJSDate(now,{zone});
+  const hours=lower.match(/\bin\s+(\d+)\s*(hours?|hrs?|minutes?|mins?)\b/);
+  if(hours){const count=Number(hours[1]);const unit=hours[2].startsWith('h')?'hours':'minutes';return base.plus({[unit]:count}).toUTC().toISO()}
   const days=lower.match(/\bin\s+(\d+)\s+days?\b/);
   let d: DateTime | null=null;
   if(days) d=base.plus({days:Number(days[1])});
@@ -44,9 +46,9 @@ export function localExtract(transcript: string): Extraction {
 }
 export async function extract(transcript: string): Promise<Extraction> {
   if(!process.env.OPENAI_API_KEY) return localExtract(transcript);
-  const response=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_MODEL||'gpt-4.1-mini',response_format:{type:'json_object'},messages:[{role:'system',content:`Extract a contact interaction. Return JSON with contactName, summary, actions array. Each action: kind one of follow_up, reminder, meeting; title; dueAt ISO UTC string or null. Interpret relative dates in Asia/Kolkata. Current IST: ${DateTime.now().setZone(zone).toISO()}. Include all distinct future actions. Do not invent dates.`},{role:'user',content:transcript}]})});
+  const response=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_MODEL||'gpt-4.1-mini',max_completion_tokens:700,response_format:{type:'json_object'},messages:[{role:'system',content:`Return only JSON: {"contactName":"","summary":"","actions":[]}. Each explicit next step has kind (follow_up, reminder, meeting), short title, and dueAt (UTC ISO or null). Use only facts stated in the note. Do not invent a person, action, date, time, or duration. A discussion without an explicit next step has actions:[]. Keep the summary to one sentence. Interpret relative dates in Asia/Kolkata; now is ${DateTime.now().setZone(zone).toISO()}. Preserve ambiguity with dueAt:null. Limit actions to 10.`},{role:'user',content:transcript}]})});
   if(!response.ok) throw new Error(`AI request failed (${response.status})`);
   const data=await response.json();
   const parsed=JSON.parse(data.choices?.[0]?.message?.content||'{}');
-  return {contactName:String(parsed.contactName||''),summary:String(parsed.summary||transcript),actions:Array.isArray(parsed.actions)?parsed.actions.map((a:DraftAction)=>({kind:['follow_up','reminder','meeting'].includes(a.kind)?a.kind:'follow_up',title:String(a.title||'Follow up'),dueAt:a.dueAt&&DateTime.fromISO(a.dueAt).isValid?a.dueAt:null})):[],mode:'AI'};
+  return {contactName:String(parsed.contactName||'').slice(0,120),summary:String(parsed.summary||transcript).slice(0,1000),actions:Array.isArray(parsed.actions)?parsed.actions.slice(0,10).filter((a:DraftAction)=>a&&['follow_up','reminder','meeting'].includes(a.kind)&&typeof a.title==='string'&&a.title.trim()).map((a:DraftAction)=>({kind:a.kind,title:a.title.trim().slice(0,500),dueAt:a.dueAt&&DateTime.fromISO(a.dueAt).isValid?a.dueAt:null})):[],mode:'AI'};
 }
