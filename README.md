@@ -1,0 +1,61 @@
+# Recall — Voice Follow Up
+
+An iPhone-first Next.js PWA for saving conversations and next steps. Each account has its own contacts, interaction timeline, actions, sessions, and push subscriptions.
+
+## Run locally
+
+Requirements: Node.js 24 or later and npm.
+
+```bash
+npm install
+npm run dev
+```
+
+Open **http://localhost:3000** (or the Local URL printed by Next.js) and create an account. Create `.env.local` from `.env.example` and fill in the keys you need. The local SQLite database is created in `data/recall.sqlite`; it persists between restarts and is excluded from version control. `npm run typecheck` and `npm run build` check the project.
+
+## What works without credentials
+
+- Email/password accounts with server-side password hashing and HTTP-only session cookies.
+- Account-isolated contacts, auto-matching, editable contact choice or creation, conversation timelines, and action status/rescheduling.
+- Typed notes and microphone recording with a live, sound-responsive waveform. The clip is saved to this device’s browser storage before transcription; the latest clip for each account can be played back and retried after a page refresh.
+- **Local rule extraction** of contact names, multiple actions, and IST dates. Review and correct every extracted field before saving. The badge says “Local rule extraction.” This is a development adapter, not an AI model; it may miss ambiguous language.
+- **Local summary** answers from saved history and pending commitments. The answer badge says “Local summary.”
+- A light sales dashboard with today’s action cards, overdue and upcoming counts, and an IST monthly calendar. The desktop calendar has day, week, and month views. Meeting blocks use the duration chosen during review.
+- Per-person action boards for meetings/reminders, follow-ups, completed tasks, and archived tasks. Completed tasks update immediately, and archived tasks can be reopened or removed from the board.
+- Manual action entry for a follow-up, callback, reminder, or meeting. It can use an existing person or create a new one, and it saves the entered context to that person’s timeline.
+- Screen selection is kept in the URL hash, so refreshing Calendar, People, a person profile, Settings, or manual entry returns to that screen.
+- Account-wide reminder controls for all dated actions, including a choice of 0, 15, 30, 60, or 1,440 minutes before the due time.
+- On-screen browser notifications for due actions while the app is open and notification permission has been granted. This does not provide background delivery.
+- A per-account Google Sheet outbox. Conversations and action updates are queued until that account configures a Sheet webhook; failed sends remain queued and can be retried.
+
+All saved times are UTC instants, interpreted and displayed in **Asia/Kolkata (IST)**. No money fields exist yet; any future money values should use INR.
+
+## Enable real AI and iPhone audio transcription
+
+Set `OPENAI_API_KEY` in `.env.local` and restart. The server then uses OpenAI for action extraction and contextual answers. The microphone always records locally first, saves the completed clip in IndexedDB, then sends that saved clip for transcription when the key is configured. Choose English or Tamil before recording. Without the key, recording and playback still work, and the user can type the transcript; no automatic voice transcription occurs. Review remains required before saving. The server and Google Sheet store the **transcript**, not the original audio file. The browser keeps only the latest local clip per account; clearing browser site data removes it.
+
+`OPENAI_MODEL` optionally changes the text model. The server uses `gpt-transcribe` for recorded audio. Failed configured AI requests surface an error; they do not silently switch to local rules.
+
+## Enable background Web Push
+
+Generate VAPID keys with `npx web-push generate-vapid-keys`, set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, and `CRON_SECRET` in `.env.local`, then restart. Tap **Enable alerts** on each device to create an account-owned subscription.
+
+The authenticated dispatcher is `PUT /api/dispatch` with `Authorization: Bearer <CRON_SECRET>`. It sends due actions to subscriptions belonging to the action's user at the account’s selected lead time and records successful delivery. Run `npm run dev:dispatch` in a second terminal for a local check every minute; keep both terminals open. A deployed scheduler is still required for production.
+
+For iPhone background Web Push, users need a supported iOS version, an HTTPS deployment, and the PWA added to the Home Screen before enabling notifications. Localhost is useful for desktop testing; it does not establish the full iPhone push path.
+
+## Connect a Google Sheet and morning email
+
+A native Google Sheet template has been created for this project. Each salesperson should use **their own copy** so their conversation data stays separate. The same instructions are available inside the app at **Settings → How to connect your Sheet**, with an example Sheet link and an Apps Script download.
+
+1. Open the salesperson’s Sheet. In **Extensions → Apps Script**, paste the contents of `integrations/RecallSheet.gs` into its script project.
+2. In **Project Settings → Script properties**, set `RECALL_SECRET` to a random string of at least 16 characters and `DIGEST_EMAIL` to that salesperson’s email address. Set the script project time zone to **Asia/Kolkata**.
+3. Run `setupRecall` once in the Apps Script editor and authorize the requested Sheet and email permissions. It creates the tabs and a daily time trigger.
+4. Deploy the script as a **Web app** that executes as the Sheet owner and is accessible to **Anyone**. The random secret in every POST request protects writes; keep it private. Copy the `/exec` URL.
+5. In Recall’s **Settings**, paste the web app URL and the same secret, then save. Recall tests the connection, sends queued transcripts and actions, and sends future changes after saving. Use **Retry queued updates** if a send fails.
+
+The Sheet has **Conversations**, **Actions**, and **Processed Events** tabs. Actions are updated in place when completed or rescheduled. The Apps Script email lists today’s pending actions in IST; an empty day gets the “next prospect” message. Apps Script’s daily time trigger runs **around** 8 a.m. IST rather than at an exact minute. If delivery strictly by 8:00 is required, use a scheduler with a delivery guarantee. The app has not yet been connected to a deployed script, so no live Sheet transfer or email is running.
+
+## Before Vercel deployment
+
+The local SQLite file is not durable on Vercel. Migrate storage to a managed database (for example Postgres), configure production environment variables, set up the scheduled dispatcher, and test installed-PWA push on iPhone and Android. Add production protections for stored Sheet secrets. No deployment has been performed.
