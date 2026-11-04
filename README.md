@@ -28,7 +28,7 @@ Open **http://localhost:3000** (or the Local URL printed by Next.js) and create 
 - On-screen browser notifications for due actions while the app is open and notification permission has been granted. This does not provide background delivery.
 - A per-account Google Sheet outbox. Conversations and action updates are queued until that account configures a Sheet webhook; failed sends remain queued and can be retried.
 
-All saved times are UTC instants, interpreted and displayed in **Asia/Kolkata (IST)**. No money fields exist yet; any future money values should use INR.
+All saved times are UTC instants, interpreted and displayed in **Asia/Kolkata (IST)**. The review screen lets you correct when a conversation happened; that timestamp cannot be in the future. Follow-up and meeting due times can be in the future, and phrases such as “in 4 hrs” are resolved from the current IST time. A selected timed action in the past raises an alert. No money fields exist yet; any future money values should use INR.
 
 ## Enable real AI and iPhone audio transcription
 

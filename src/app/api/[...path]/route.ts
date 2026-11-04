@@ -71,16 +71,19 @@ export async function POST(req:NextRequest,{params}:Context) {
     if(path==='save') {
       const transcript=clean(body.transcript), summary=clean(body.summary);
       if(transcript.length<3||!summary) return error('A note and summary are required.');
+      const occurredAt=body.occurredAt===undefined?now():clean(body.occurredAt);
+      if(!DateTime.fromISO(occurredAt).isValid||DateTime.fromISO(occurredAt).toMillis()>Date.now()) return error('Conversation time cannot be in the future. Choose when you spoke in IST.');
       let contactId=clean(body.contactId), contactName=clean(body.contactName);
       const actions=Array.isArray(body.actions)?body.actions as DraftAction[]:[];
       if(actions.length>20) return error('Too many actions in one note.');
       for(const action of actions) if(!['follow_up','reminder','meeting'].includes(action.kind)||!clean(action.title)||action.title.length>500||(action.dueAt&&!DateTime.fromISO(action.dueAt).isValid)||!Number.isInteger(action.durationMinutes??30)||(action.durationMinutes??30)<15||(action.durationMinutes??30)>480) return error('Review the action titles, dates, and durations.');
+      if(actions.some(action=>action.dueAt&&action.timeSpecified!==false&&DateTime.fromISO(action.dueAt).toMillis()<Date.now())) return error('A timed action cannot be scheduled in the past. Choose a later time in IST.');
       const transaction=db();transaction.exec('BEGIN');
       try {
         if(contactId) {const contact=row('SELECT id FROM contacts WHERE id=? AND user_id=?',contactId,user.id);if(!contact) throw new Error('Contact not found');}
         else {if(!contactName||contactName.length>120) throw new Error('Choose or enter a contact name');contactId=randomUUID();run('INSERT INTO contacts(id,user_id,name,created_at) VALUES(?,?,?,?)',contactId,user.id,contactName,now());}
         const interactionId=randomUUID();
-        run('INSERT INTO interactions(id,user_id,contact_id,transcript,summary,occurred_at,created_at) VALUES(?,?,?,?,?,?,?)',interactionId,user.id,contactId,transcript,summary,now(),now());
+        run('INSERT INTO interactions(id,user_id,contact_id,transcript,summary,occurred_at,created_at) VALUES(?,?,?,?,?,?,?)',interactionId,user.id,contactId,transcript,summary,occurredAt,now());
         for(const action of actions) run('INSERT INTO actions(id,user_id,contact_id,interaction_id,kind,title,due_at,time_specified,duration_minutes,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',randomUUID(),user.id,contactId,interactionId,action.kind,clean(action.title),action.dueAt||null,action.timeSpecified===false?0:1,action.durationMinutes??30,'pending',now());
         const contact=row<{name:string}>('SELECT name FROM contacts WHERE id=? AND user_id=?',contactId,user.id)!;
         enqueueSheetEvent(user.id,{type:'interaction',interactionId,contactId,contactName:contact.name,transcript,summary,recordedAt:now()});
@@ -106,6 +109,7 @@ export async function POST(req:NextRequest,{params}:Context) {
       const dueAt=body.dueAt===undefined?current.dueAt:(body.dueAt||null);
       const timeSpecified=body.timeSpecified===undefined?current.timeSpecified:body.timeSpecified===false?0:1;
       if(!title||title.length>500||(dueAt&&!DateTime.fromISO(dueAt).isValid))return error('Enter a valid title and date.');
+      if(body.dueAt!==undefined&&dueAt&&timeSpecified!==0&&DateTime.fromISO(dueAt).toMillis()<Date.now())return error('A timed action cannot be scheduled in the past. Choose a later time in IST.');
       const result=run('UPDATE actions SET status=?,title=?,due_at=?,time_specified=?,notified_at=NULL WHERE id=? AND user_id=?',status,title,dueAt,timeSpecified,id,user.id);
       if(!result.changes)return error('Action not found',404);
       const action=row<{interactionId:string|null;contactId:string;contactName:string;kind:string;createdAt:string}>('SELECT a.interaction_id AS interactionId,a.contact_id AS contactId,c.name AS contactName,a.kind,a.created_at AS createdAt FROM actions a JOIN contacts c ON c.id=a.contact_id WHERE a.id=? AND a.user_id=?',id,user.id)!;

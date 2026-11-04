@@ -248,6 +248,13 @@ a:hover,.text-link:hover,.back:hover,.sales-back:hover,.auth-switch button:hover
 .review-flow .ist-picker{gap:7px;padding:10px}
 .review-flow .review-footer{padding:17px 0}
 .ist-picker-warning{display:block;border:1px solid #f1cfb4;border-radius:9px;background:#fff3e9;color:#9b4c25;padding:9px 10px;font-size:11px;font-weight:700}
+.conversation-time{margin-top:12px;border:1px solid #e0ebe2;border-radius:11px;background:#fbfdfb}
+.conversation-time>summary{display:flex;align-items:center;justify-content:space-between;gap:9px;cursor:pointer;list-style:none;padding:10px 12px;color:#416c52;font-size:11px;font-weight:800}
+.conversation-time>summary::-webkit-details-marker{display:none}
+.conversation-time>summary span{color:#849b88;font-size:10px;font-weight:600;text-align:right}
+.conversation-time .ist-picker{border:0;border-top:1px solid #e0ebe2;border-radius:0;background:transparent}
+.ist-calendar-grid button:disabled{opacity:.3;cursor:not-allowed}
+.ist-calendar-head button:disabled{opacity:.3;cursor:not-allowed}
 @media(min-width:1100px){
   .review-flow .review-card{display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);column-gap:26px;align-items:start}
   .review-flow .review-section:nth-child(1){grid-column:1;grid-row:1}
