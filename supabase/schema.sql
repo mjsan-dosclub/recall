@@ -24,7 +24,7 @@ create index if not exists recall_contacts_user on public.recall_contacts(user_i
 create table if not exists public.recall_interactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.recall_users(id) on delete cascade,
-  contact_id uuid not null references public.recall_contacts(id) on delete cascade,
+  contact_id uuid references public.recall_contacts(id) on delete cascade,
   transcript text not null,
   summary text not null,
   occurred_at timestamptz not null,
@@ -34,7 +34,7 @@ create index if not exists recall_interactions_contact on public.recall_interact
 create table if not exists public.recall_actions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.recall_users(id) on delete cascade,
-  contact_id uuid not null references public.recall_contacts(id) on delete cascade,
+  contact_id uuid references public.recall_contacts(id) on delete cascade,
   interaction_id uuid references public.recall_interactions(id) on delete set null,
   kind text not null check (kind in ('follow_up','reminder','meeting')),
   title text not null,
@@ -101,13 +101,15 @@ begin
     select name into v_contact_name from public.recall_contacts where id=v_contact_id and user_id=p_user_id;
     if v_contact_name is null then raise exception 'Contact not found'; end if;
   else
-    if length(trim(coalesce(p_contact_name,''))) < 1 or length(p_contact_name) > 120 then
-      raise exception 'Choose or enter a contact name';
+    if length(trim(coalesce(p_contact_name,''))) > 120 then raise exception 'Person name is too long'; end if;
+    if length(trim(coalesce(p_contact_name,''))) > 0 then
+      v_contact_id := gen_random_uuid();
+      v_contact_name := trim(p_contact_name);
+      insert into public.recall_contacts(id,user_id,name,created_at)
+        values(v_contact_id,p_user_id,v_contact_name,v_created_at);
+    else
+      v_contact_name := '';
     end if;
-    v_contact_id := gen_random_uuid();
-    v_contact_name := trim(p_contact_name);
-    insert into public.recall_contacts(id,user_id,name,created_at)
-      values(v_contact_id,p_user_id,v_contact_name,v_created_at);
   end if;
   insert into public.recall_interactions(id,user_id,contact_id,transcript,summary,occurred_at,created_at)
     values(v_interaction_id,p_user_id,v_contact_id,p_transcript,p_summary,p_occurred_at,v_created_at);
