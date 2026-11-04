@@ -4,9 +4,9 @@ import { Mic, Square, UploadCloud } from 'lucide-react';
 import { getLocalClip, getLatestLocalClip, saveLocalClip } from '@/lib/localAudio';
 
 const BAR_COUNT = 23;
-type Props = { ownerId: string; language: 'en' | 'ta'; transcriptionConfigured: boolean; onTranscript: (text: string) => void; onError: (message: string) => void };
+type Props = { ownerId: string; language: 'en' | 'ta'; transcriptionConfigured: boolean; provider: string; onTranscript: (text: string) => void; onError: (message: string) => void };
 
-export default function VoiceCapture({ownerId,language,transcriptionConfigured,onTranscript,onError}: Props) {
+export default function VoiceCapture({ownerId,language,transcriptionConfigured,provider,onTranscript,onError}: Props) {
   const [recording,setRecording] = useState(false);
   const [working,setWorking] = useState(false);
   const [clipId,setClipId] = useState('');
@@ -57,7 +57,7 @@ export default function VoiceCapture({ownerId,language,transcriptionConfigured,o
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||'Transcription failed');
       onTranscript(result.transcript||'');
-      setStatus('Transcript ready. Listen and correct anything before saving.');
+      setStatus(`Transcript ready via ${provider}. Listen and correct anything before saving.`);
     } catch(error) {
       const message=error instanceof Error?error.message:String(error);
       onError(message);setStatus('Audio remains saved on this device. You can retry transcription.');
@@ -123,6 +123,6 @@ export default function VoiceCapture({ownerId,language,transcriptionConfigured,o
     <strong>{recording?`Recording · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`:working?'Processing your recording…':'Record a voice note'}</strong>
     <span role="status">{status}</span>
     <div className="live-wave" aria-label={recording?'Live microphone level':'Microphone is idle'}>{Array.from({length:BAR_COUNT},(_,i)=><span key={i} ref={element=>{bars.current[i]=element}}/>)}</div>
-    {clipUrl&&<div className="local-clip"><audio controls src={clipUrl} aria-label="Saved voice note"/><small>Saved in this browser for your account · {clipId.slice(0,8)}</small>{transcriptionConfigured&&<button onClick={()=>transcribe(clipId)} disabled={working||recording}><UploadCloud size={15}/> Retry transcription</button>}</div>}
+    {transcriptionConfigured&&<small className="voice-provider">Saved locally first · Sent to {provider} for transcription</small>}{clipUrl&&<div className="local-clip"><audio controls src={clipUrl} aria-label="Saved voice note"/><small>Saved in this browser for your account · {clipId.slice(0,8)}</small>{transcriptionConfigured&&<button onClick={()=>transcribe(clipId)} disabled={working||recording}><UploadCloud size={15}/> Retry transcription</button>}</div>}
   </div>;
 }

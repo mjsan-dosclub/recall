@@ -20,13 +20,13 @@ function sameOrigin(req:NextRequest) { const origin=req.headers.get('origin'); i
 export async function GET(req:NextRequest,{params}:Context) {
   try {
     const path=(await params).path.join('/');
-    if(path==='me') return json({user:await currentUser(),aiMode:process.env.OPENAI_API_KEY?'AI':'Local rules',transcriptionConfigured:!!process.env.OPENAI_API_KEY,pushConfigured:!!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY),vapidPublicKey:process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY||''});
+    if(path==='me') return json({user:await currentUser(),aiMode:process.env.OPENAI_API_KEY?'AI':'Local rules',transcriptionConfigured:!!(process.env.GEMINI_API_KEY||process.env.OPENAI_API_KEY),transcriptionProvider:process.env.GEMINI_API_KEY?'Google Gemini':process.env.OPENAI_API_KEY?'OpenAI':'None',pushConfigured:!!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY),vapidPublicKey:process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY||''});
     const user=await onlyMine();
     if(path==='settings') return json(getSettings(user.id));
     if(path==='dashboard') {
       getSettings(user.id);
       const contacts=rows('SELECT id,name,phone,created_at AS createdAt FROM contacts WHERE user_id=? ORDER BY name COLLATE NOCASE',user.id);
-      const actions=rows('SELECT a.id,a.contact_id AS contactId,c.name AS contactName,a.kind,a.title,a.due_at AS dueAt,a.duration_minutes AS durationMinutes,a.status,a.created_at AS createdAt FROM actions a JOIN contacts c ON c.id=a.contact_id WHERE a.user_id=? ORDER BY CASE WHEN a.status=? THEN 0 ELSE 1 END,a.due_at IS NULL,a.due_at,a.created_at DESC LIMIT 1000',user.id,'pending');
+      const actions=rows('SELECT a.id,a.contact_id AS contactId,c.name AS contactName,a.kind,a.title,a.due_at AS dueAt,a.time_specified AS timeSpecified,a.duration_minutes AS durationMinutes,a.status,a.created_at AS createdAt FROM actions a JOIN contacts c ON c.id=a.contact_id WHERE a.user_id=? ORDER BY CASE WHEN a.status=? THEN 0 ELSE 1 END,a.due_at IS NULL,a.due_at,a.created_at DESC LIMIT 1000',user.id,'pending');
       const interactions=rows('SELECT i.id,i.contact_id AS contactId,c.name AS contactName,i.summary,i.transcript,i.occurred_at AS occurredAt FROM interactions i JOIN contacts c ON c.id=i.contact_id WHERE i.user_id=? ORDER BY i.occurred_at DESC LIMIT 30',user.id);
       return json({contacts,actions,interactions});
     }
@@ -34,7 +34,7 @@ export async function GET(req:NextRequest,{params}:Context) {
       const id=req.nextUrl.searchParams.get('id')||'';
       const contact=row('SELECT id,name,phone,created_at AS createdAt FROM contacts WHERE id=? AND user_id=?',id,user.id);
       if(!contact) return error('Contact not found',404);
-      return json({contact,interactions:rows('SELECT id,transcript,summary,occurred_at AS occurredAt FROM interactions WHERE contact_id=? AND user_id=? ORDER BY occurred_at DESC',id,user.id),actions:rows('SELECT a.id,a.kind,a.title,a.due_at AS dueAt,a.duration_minutes AS durationMinutes,a.status,a.created_at AS createdAt,i.summary AS conversationSummary FROM actions a LEFT JOIN interactions i ON i.id=a.interaction_id AND i.user_id=a.user_id WHERE a.contact_id=? AND a.user_id=? ORDER BY a.created_at DESC',id,user.id)});
+      return json({contact,interactions:rows('SELECT id,transcript,summary,occurred_at AS occurredAt FROM interactions WHERE contact_id=? AND user_id=? ORDER BY occurred_at DESC',id,user.id),actions:rows('SELECT a.id,a.kind,a.title,a.due_at AS dueAt,a.time_specified AS timeSpecified,a.duration_minutes AS durationMinutes,a.status,a.created_at AS createdAt,i.summary AS conversationSummary FROM actions a LEFT JOIN interactions i ON i.id=a.interaction_id AND i.user_id=a.user_id WHERE a.contact_id=? AND a.user_id=? ORDER BY a.created_at DESC',id,user.id)});
     }
     return error('Not found',404);
   } catch(e) {return asError(e);}
@@ -81,10 +81,10 @@ export async function POST(req:NextRequest,{params}:Context) {
         else {if(!contactName||contactName.length>120) throw new Error('Choose or enter a contact name');contactId=randomUUID();run('INSERT INTO contacts(id,user_id,name,created_at) VALUES(?,?,?,?)',contactId,user.id,contactName,now());}
         const interactionId=randomUUID();
         run('INSERT INTO interactions(id,user_id,contact_id,transcript,summary,occurred_at,created_at) VALUES(?,?,?,?,?,?,?)',interactionId,user.id,contactId,transcript,summary,now(),now());
-        for(const action of actions) run('INSERT INTO actions(id,user_id,contact_id,interaction_id,kind,title,due_at,duration_minutes,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',randomUUID(),user.id,contactId,interactionId,action.kind,clean(action.title),action.dueAt||null,action.durationMinutes??30,'pending',now());
+        for(const action of actions) run('INSERT INTO actions(id,user_id,contact_id,interaction_id,kind,title,due_at,time_specified,duration_minutes,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',randomUUID(),user.id,contactId,interactionId,action.kind,clean(action.title),action.dueAt||null,action.timeSpecified===false?0:1,action.durationMinutes??30,'pending',now());
         const contact=row<{name:string}>('SELECT name FROM contacts WHERE id=? AND user_id=?',contactId,user.id)!;
         enqueueSheetEvent(user.id,{type:'interaction',interactionId,contactId,contactName:contact.name,transcript,summary,recordedAt:now()});
-        const savedActions=rows<{id:string;kind:string;title:string;dueAt:string|null;durationMinutes:number;status:string;createdAt:string}>('SELECT id,kind,title,due_at AS dueAt,duration_minutes AS durationMinutes,status,created_at AS createdAt FROM actions WHERE interaction_id=? AND user_id=?',interactionId,user.id);
+        const savedActions=rows<{id:string;kind:string;title:string;dueAt:string|null;timeSpecified:number;durationMinutes:number;status:string;createdAt:string}>('SELECT id,kind,title,due_at AS dueAt,time_specified AS timeSpecified,duration_minutes AS durationMinutes,status,created_at AS createdAt FROM actions WHERE interaction_id=? AND user_id=?',interactionId,user.id);
         for(const action of savedActions)enqueueSheetEvent(user.id,{type:'action',actionId:action.id,interactionId,contactId,contactName:contact.name,...action});
         transaction.exec('COMMIT');
         const sync=await flushSheetOutbox(user.id);
@@ -100,15 +100,16 @@ export async function POST(req:NextRequest,{params}:Context) {
     if(path==='action') {
       const id=clean(body.id),status=clean(body.status);
       if(!['pending','done','archived','removed'].includes(status)) return error('Invalid status');
-      const current=row<{title:string;dueAt:string|null}>('SELECT title,due_at AS dueAt FROM actions WHERE id=? AND user_id=?',id,user.id);
+      const current=row<{title:string;dueAt:string|null;timeSpecified:number}>('SELECT title,due_at AS dueAt,time_specified AS timeSpecified FROM actions WHERE id=? AND user_id=?',id,user.id);
       if(!current)return error('Action not found',404);
       const title=body.title===undefined?current.title:clean(body.title);
       const dueAt=body.dueAt===undefined?current.dueAt:(body.dueAt||null);
+      const timeSpecified=body.timeSpecified===undefined?current.timeSpecified:body.timeSpecified===false?0:1;
       if(!title||title.length>500||(dueAt&&!DateTime.fromISO(dueAt).isValid))return error('Enter a valid title and date.');
-      const result=run('UPDATE actions SET status=?,title=?,due_at=?,notified_at=NULL WHERE id=? AND user_id=?',status,title,dueAt,id,user.id);
+      const result=run('UPDATE actions SET status=?,title=?,due_at=?,time_specified=?,notified_at=NULL WHERE id=? AND user_id=?',status,title,dueAt,timeSpecified,id,user.id);
       if(!result.changes)return error('Action not found',404);
       const action=row<{interactionId:string|null;contactId:string;contactName:string;kind:string;createdAt:string}>('SELECT a.interaction_id AS interactionId,a.contact_id AS contactId,c.name AS contactName,a.kind,a.created_at AS createdAt FROM actions a JOIN contacts c ON c.id=a.contact_id WHERE a.id=? AND a.user_id=?',id,user.id)!;
-      enqueueSheetEvent(user.id,{type:'action',actionId:id,...action,title,dueAt,status});
+      enqueueSheetEvent(user.id,{type:'action',actionId:id,...action,title,dueAt,timeSpecified,status});
       const sync=await flushSheetOutbox(user.id);
       return json({ok:true,sheetSyncPending:sync.pending});
     }

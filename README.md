@@ -20,9 +20,9 @@ Open **http://localhost:3000** (or the Local URL printed by Next.js) and create 
 - Typed notes and microphone recording with a live, sound-responsive waveform. The clip is saved to this device’s browser storage before transcription; the latest clip for each account can be played back and retried after a page refresh.
 - **Local rule extraction** of contact names, multiple actions, and IST dates. Review and correct every extracted field before saving. The badge says “Local rule extraction.” This is a development adapter, not an AI model; it may miss ambiguous language.
 - **Local summary** answers from saved history and pending commitments. The answer badge says “Local summary.”
-- A light sales dashboard with today’s action cards, overdue and upcoming counts, and an IST monthly calendar. The desktop calendar has day, week, and month views. Meeting blocks use the duration chosen during review.
+- A mobile-first follow-up home screen with tappable All, Today, Overdue, Upcoming, and Completed summary boxes. Each opens its filtered list on the same page; today’s cards are highlighted. Quick follow-up entry stays on that page. Calendar remains a separate view, with month on mobile and day, week, and month on desktop.
 - Per-person action boards for meetings/reminders, follow-ups, completed tasks, and archived tasks. Completed tasks update immediately, and archived tasks can be reopened or removed from the board.
-- Manual action entry for a follow-up, callback, reminder, or meeting. It can use an existing person or create a new one, and it saves the entered context to that person’s timeline.
+- Manual action entry for a follow-up, callback, reminder, or meeting. It can use an existing person or create a new one, and it saves the entered context to that person’s timeline. Quick entry, manual entry, review, and rescheduling share a themed IST date picker with Today, Tomorrow, a calendar, and optional time. Date-only actions use 9:00 a.m. IST for reminder scheduling.
 - Screen selection is kept in the URL hash, so refreshing Calendar, People, a person profile, Settings, or manual entry returns to that screen.
 - Account-wide reminder controls for all dated actions, including a choice of 0, 15, 30, 60, or 1,440 minutes before the due time.
 - On-screen browser notifications for due actions while the app is open and notification permission has been granted. This does not provide background delivery.
@@ -32,9 +32,9 @@ All saved times are UTC instants, interpreted and displayed in **Asia/Kolkata (I
 
 ## Enable real AI and iPhone audio transcription
 
-Set `OPENAI_API_KEY` in `.env.local` and restart. The server then uses OpenAI for action extraction and contextual answers. The microphone always records locally first, saves the completed clip in IndexedDB, then sends that saved clip for transcription when the key is configured. Choose English or Tamil before recording. Without the key, recording and playback still work, and the user can type the transcript; no automatic voice transcription occurs. Review remains required before saving. The server and Google Sheet store the **transcript**, not the original audio file. The browser keeps only the latest local clip per account; clearing browser site data removes it.
+Set `GEMINI_API_KEY` in `.env.local` to enable Google Gemini audio transcription for English, Tamil, and mixed speech. This is the Gemini API, not Google Cloud Speech-to-Text. The server uses `GEMINI_TRANSCRIPTION_MODEL` (default `gemini-3.5-flash-lite`). An existing OpenAI key remains a fallback if no Gemini key is set; `OPENAI_API_KEY` also enables AI action extraction and contextual answers. Without either key, recording and playback still work locally and the user can type the transcript. Review remains required before saving. Audio is saved in IndexedDB on the device first, then sent to the configured transcription provider. Recall’s server and Google Sheet store the transcript, not the original audio file. The provider receives the audio for transcription.
 
-`OPENAI_MODEL` optionally changes the text model. The server uses `gpt-transcribe` for recorded audio. Failed configured AI requests surface an error; they do not silently switch to local rules.
+`OPENAI_MODEL` optionally changes the text model. If Gemini is absent, the server uses `gpt-transcribe` for recorded audio. Failed configured AI requests surface an error; they do not silently switch to local rules.
 
 ## Enable background Web Push
 

@@ -1,7 +1,7 @@
 import * as chrono from 'chrono-node';
 import { DateTime } from 'luxon';
 
-export type DraftAction = { kind: 'follow_up'|'reminder'|'meeting'; title: string; dueAt: string | null; durationMinutes?: number };
+export type DraftAction = { kind: 'follow_up'|'reminder'|'meeting'; title: string; dueAt: string | null; timeSpecified?: boolean; durationMinutes?: number };
 export type Extraction = { contactName: string; summary: string; actions: DraftAction[]; mode: 'AI'|'Local rules' };
 const zone='Asia/Kolkata';
 export function parseIST(phrase: string, now=new Date()): string | null {
@@ -30,7 +30,7 @@ export function parseIST(phrase: string, now=new Date()): string | null {
 }
 export function localExtract(transcript: string): Extraction {
   const clean=transcript.trim();
-  const match=clean.match(/\b(?:spoke (?:to|with)|talked (?:to|with)|met (?:with)?|called|call|meeting with|follow up with|about)\s+([A-Z][\p{L}.'-]*(?:\s+[A-Z][\p{L}.'-]*)?)/iu);
+  const match=clean.match(/\b(?:spoke (?:to|with)|talked (?:to|with)|met (?:with)?|called|call|meeting with|follow up with|about)\s+([A-Z][\p{L}'-]*(?:\s+[A-Z][\p{L}'-]*)?)/iu);
   const contactName=match?.[1]?.replace(/[.,;!?]+$/,'').replace(/\s+(today|tomorrow|about|and|yesterday)$/i,'').trim() || '';
   const segments=clean.split(/(?:[.;]|\s+and\s+(?=(?:call|follow|remind|meet|schedule|reschedule|send|check)\b))/i).map(s=>s.trim()).filter(Boolean);
   const actions: DraftAction[]=[];
