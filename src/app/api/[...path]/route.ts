@@ -6,6 +6,8 @@ import { clearSession, currentUser, passwordHash, passwordValid, setSession } fr
 import { db, row, rows, run } from '@/lib/db';
 import { extract, type DraftAction } from '@/lib/extract';
 import { enqueueSheetEvent, flushSheetOutbox, getSettings } from '@/lib/settings';
+import { cloudConfigured } from '@/lib/cloud';
+import { cloudGET, cloudPOST, cloudDELETE, cloudDispatch } from '@/lib/cloudRoutes';
 
 export const runtime='nodejs';
 type Context={params:Promise<{path:string[]}>};
@@ -18,6 +20,8 @@ const asError=(e:unknown)=>error(e instanceof Error?e.message:'Something went wr
 function sameOrigin(req:NextRequest) { const origin=req.headers.get('origin'); if(!origin)return true;try{return new URL(origin).host===req.headers.get('host')}catch{return false} }
 
 export async function GET(req:NextRequest,{params}:Context) {
+  if(cloudConfigured())return cloudGET(req,{params});
+  if(process.env.NODE_ENV==='production')return error('Production database is not configured.',503);
   try {
     const path=(await params).path.join('/');
     if(path==='me') return json({user:await currentUser(),aiMode:process.env.OPENAI_API_KEY?'AI':'Local rules',transcriptionConfigured:!!(process.env.GEMINI_API_KEY||process.env.OPENAI_API_KEY),transcriptionProvider:process.env.GEMINI_API_KEY?'Google Gemini':process.env.OPENAI_API_KEY?'OpenAI':'None',pushConfigured:!!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY),vapidPublicKey:process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY||''});
@@ -41,6 +45,8 @@ export async function GET(req:NextRequest,{params}:Context) {
 }
 
 export async function POST(req:NextRequest,{params}:Context) {
+  if(cloudConfigured())return cloudPOST(req,{params});
+  if(process.env.NODE_ENV==='production')return error('Production database is not configured.',503);
   try {
     if(!sameOrigin(req)) return error('Invalid origin',403);
     const path=(await params).path.join('/');
@@ -123,7 +129,7 @@ export async function POST(req:NextRequest,{params}:Context) {
       if(![0,15,30,60,1440].includes(reminderMinutes))return error('Choose a reminder time from the list.');
       const sheetWebhookUrl=clean(body.sheetWebhookUrl);
       const sheetSecret=clean(body.sheetSecret);
-      if(sheetWebhookUrl){try{const u=new URL(sheetWebhookUrl);const local=process.env.NODE_ENV!=='production'&&['127.0.0.1','localhost'].includes(u.hostname);if(!(u.protocol==='https:'&&['script.google.com','script.googleusercontent.com'].includes(u.hostname))&&!local)return error('Use an Apps Script web app URL.');}catch{return error('Enter a valid Apps Script URL.')}}
+      if(sheetWebhookUrl){try{const u=new URL(sheetWebhookUrl);const local=['127.0.0.1','localhost'].includes(u.hostname);if(!(u.protocol==='https:'&&['script.google.com','script.googleusercontent.com'].includes(u.hostname))&&!local)return error('Use an Apps Script web app URL.');}catch{return error('Enter a valid Apps Script URL.')}}
       if(sheetWebhookUrl&&sheetSecret.length<16&&!getSettings(user.id).sheetConnected)return error('Use a sheet secret of at least 16 characters.');
       const existing=row<{secret:string|null}>('SELECT sheet_secret AS secret FROM user_settings WHERE user_id=?',user.id);
       run('INSERT INTO user_settings(user_id,push_enabled,reminder_minutes,sheet_webhook_url,sheet_secret,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET push_enabled=excluded.push_enabled,reminder_minutes=excluded.reminder_minutes,sheet_webhook_url=excluded.sheet_webhook_url,sheet_secret=excluded.sheet_secret,updated_at=excluded.updated_at',user.id,pushEnabled?'1':'0',String(reminderMinutes),sheetWebhookUrl||null,sheetWebhookUrl?(sheetSecret||existing?.secret||null):null,now());
@@ -160,10 +166,14 @@ export async function POST(req:NextRequest,{params}:Context) {
 }
 
 export async function DELETE(req:NextRequest,{params}:Context) {
+  if(cloudConfigured())return cloudDELETE(req,{params});
+  if(process.env.NODE_ENV==='production')return error('Production database is not configured.',503);
   try {if(!sameOrigin(req)) return error('Invalid origin',403);const path=(await params).path.join('/');const user=await onlyMine();if(path==='push/subscribe'){const endpoint=req.nextUrl.searchParams.get('endpoint')||'';run('DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?',user.id,endpoint);return json({ok:true});}return error('Not found',404);}catch(e){return asError(e);}
 }
 
 export async function PUT(req:NextRequest,{params}:Context) {
+  if(cloudConfigured())return cloudDispatch(req);
+  if(process.env.NODE_ENV==='production')return error('Production database is not configured.',503);
   try {
     const path=(await params).path.join('/');if(path!=='dispatch') return error('Not found',404);
     if(!process.env.CRON_SECRET||req.headers.get('authorization')!==`Bearer ${process.env.CRON_SECRET}`) return error('Unauthorized',401);
