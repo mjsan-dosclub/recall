@@ -1,0 +1,132 @@
+/* One visual system for sign-in, capture, actions, calendar, settings, and help. */
+:root{
+  --green:#174c43;
+  --green2:#216b59;
+  --ink:#14241f;
+  --muted:#71867a;
+  --line:#e1ebe3;
+  --cream:#f8faf7;
+  --gold:#dff0d6;
+  --surface:#fff;
+  --shadow:0 10px 30px #234f3910;
+}
+html,body{background:var(--cream);color:var(--ink)}
+body,button,input,select,textarea{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+h1,h2,h3,h4{color:var(--ink);font-family:inherit}
+button,a,input,select,textarea{transition:background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease}
+button:hover:not(:disabled){filter:brightness(.97)}
+button:active:not(:disabled){transform:translateY(1px)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #52b992;outline-offset:3px}
+input:focus,select:focus,textarea:focus{border-color:#55ad82!important;box-shadow:0 0 0 4px #55ad8220}
+a,.text-link,.back,.sales-back,.auth-switch button{color:#287859}
+a:hover,.text-link:hover,.back:hover,.sales-back:hover,.auth-switch button:hover{text-decoration:underline;text-underline-offset:3px}
+.eyebrow,.sales-overline,.manual-step{color:#6b987c}
+.heading-period{color:#4da982}
+.brand-mark{background:var(--green);color:#e6f8e7;box-shadow:0 5px 14px #174c4320}
+
+/* Landing and authentication */
+.auth-page{background:#f8faf7;grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr)}
+.auth-visual{background:linear-gradient(130deg,#a5ebbd 0%,#c7eed7 43%,#c7e7f2 100%);color:var(--ink);padding:42px clamp(32px,4vw,68px)}
+.auth-visual:before{background:radial-gradient(circle at 12% 24%,#8fe0a6ba,transparent 42%),radial-gradient(circle at 83% 16%,#a4cbf1b8,transparent 43%);opacity:1}
+.auth-top{font-size:12px;color:#204b3b;letter-spacing:.16em}
+.auth-top .brand-mark{background:var(--green);color:#e6f8e7}
+.auth-message{margin-bottom:11vh;max-width:570px}
+.auth-message h1{font-size:clamp(42px,4.7vw,70px);line-height:1.08;letter-spacing:-.065em;margin:18px 0 19px}
+.auth-message p{color:#3f7059;max-width:430px;font-size:15px;line-height:1.65}
+.eyebrow.light{color:#347f5c}
+.auth-ornament{right:-100px;bottom:-160px}
+.orb{border-color:#ffffffad;box-shadow:0 0 0 1px #a2d7b523 inset}
+.orb-three{background:#ffffff38}
+.auth-form-wrap{background:#f8faf7;padding:28px}
+.auth-form{width:min(100%,455px);background:#fff;border:1px solid var(--line);border-radius:24px;padding:clamp(25px,3vw,42px);box-shadow:var(--shadow)}
+.auth-form h2{font-size:clamp(28px,2.5vw,36px);letter-spacing:-.055em}
+.auth-form>.muted{color:var(--muted);margin-bottom:24px}
+.auth-form label{color:#526f5c}
+.auth-form input{border-color:var(--line);background:#fbfdfb;border-radius:11px;min-height:45px}
+.auth-switch{margin:20px 0 0}
+.auth-switch button{color:#287859}
+.auth-foot{margin:23px 0 0;color:#8fa298}
+
+/* Shared controls and feedback */
+.primary,.sales-save-button,.manual-footer button,.sheet-guide-settings{background:var(--green);border:1px solid var(--green);border-radius:11px;color:#fff;box-shadow:0 6px 15px #174c4318}
+.primary:hover:not(:disabled),.sales-save-button:hover:not(:disabled),.manual-footer button:hover:not(:disabled),.sheet-guide-settings:hover:not(:disabled){background:var(--green2);border-color:var(--green2);filter:none}
+.sales-secondary-button,.contact-toolbar button,.suggestions button,.sales-section-actions button:first-child,.sheet-guide-links a:last-child,.add-action{background:#f0f8f2;border:1px solid #d5e9db;color:#2d7956;border-radius:10px}
+.sales-secondary-button:hover:not(:disabled),.contact-toolbar button:hover:not(:disabled),.suggestions button:hover:not(:disabled),.sales-section-actions button:first-child:hover:not(:disabled),.add-action:hover:not(:disabled){background:#e1f2e5;filter:none}
+.error{background:#fff1e9;border:1px solid #f0c9b7;color:#a34e32;border-radius:12px;box-shadow:0 4px 15px #af58320c}
+.toast{top:17px;right:18px;background:#fff;color:#245b44;border:1px solid #cce9d5;border-left:4px solid #42aa77;border-radius:12px;box-shadow:0 12px 28px #173d2b1c}
+.sales-settings-message{background:#eaf7ed;border:1px solid #cae8d3;color:#2c7352;border-radius:11px}
+.sales-task-card.featured h3{color:#fff}
+.sales-task-card.featured p{color:#e8fff4}
+.sales-welcome h1{margin-top:0}
+.loading-screen{background:linear-gradient(140deg,#edf9ef,#ecf7f8)}
+.loading-screen .brand-mark{font-size:26px}
+
+/* Shared surfaces across all signed-in pages */
+.main{background:#f8faf7}
+.sidebar{border-color:var(--line)}
+.sidebar nav button{color:#61776a;border-radius:11px}
+.sidebar nav button:hover,.sidebar nav button.active{background:#eaf5ed;color:var(--green);filter:none}
+.timezone-card{background:#f2f8f3;border-color:var(--line)}
+.profile{border-radius:12px;padding:13px 8px;margin-top:10px;border:1px solid transparent}
+.profile:hover{background:#f2f8f3;border-color:var(--line);filter:none}
+.avatar{background:#e4f2e8;color:#3e8061}
+.panel,.review-card,.capture-card,.person-card,.manual-card,.ask-card,.answer-card,.sales-setting-card,.sheet-guide-steps,.sales-calendar,.sales-side-panel,.calendar-desktop{background:#fff;border-color:var(--line);border-radius:18px;box-shadow:0 5px 18px #234f3908}
+.person-card:hover{border-color:#8fc8a5;box-shadow:0 11px 25px #234f3914;filter:none;transform:translateY(-2px)}
+.contact-head h1,.page-heading h1,.manual-heading h1,.ask-heading h1,.sales-settings-title h1,.flow-heading h1{letter-spacing:-.055em}
+.flow-page .back,.standard-page .back,.sales-back{margin-bottom:19px}
+.flow-heading{margin-bottom:22px}
+.flow-heading h1{margin-top:8px}
+.review-section{border-color:#e9f0e9}
+.draft-action{background:#fbfdfb;border-color:#e1ebe3;border-radius:12px}
+.review-section input,.review-section select,.review-section textarea,.transcript,.manual-form-section input,.manual-form-section select,.manual-form-section textarea,.sales-setting-label input,.sales-setting-label select,.ask-card select,.ask-input,.search-box{background:#fbfdfb;border-color:#dae8de;border-radius:11px}
+.ask-input input,.search-box input{background:transparent}
+.ask-input button{background:var(--green);border-radius:9px}
+.suggestions button{font-weight:700}
+.answer-card{border-left:4px solid #7cc59a}
+.answer-head,.mode-pill{color:#337755}
+.sales-language-picker button.active,.manual-kind-picker button.active{background:var(--green);border-color:var(--green);color:#fff}
+.sales-language-picker button:not(.active),.manual-kind-picker button:not(.active){background:#f8fcf9;border-color:var(--line);color:#638170}
+.sales-language-picker button:hover,.manual-kind-picker button:hover{filter:none;border-color:#86c29c}
+.mic-button{background:var(--green);color:#e7f7e3}
+.live-wave span{background:#c4dac9}
+.sales-setting-card .sales-setting-icon,.ask-icon{background:#e7f6eb;color:#32845d}
+.sales-setting-card .sales-setting-icon.blue{background:#e8f2fa;color:#4b88a9}
+.sales-logout{color:#537763;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff}
+.sales-logout:hover{background:#f1f8f3;filter:none}
+.board-column,.board-card{border-color:var(--line)}
+.board-card-actions button{background:#eaf5ed;color:#327c56}
+.board-card-actions button:hover{background:#dff0e4;filter:none}
+.sheet-guide-links a:first-child{background:var(--green)}
+.sheet-guide-links a:hover{text-decoration:none;filter:brightness(.96)}
+.calendar-modes button.active,.calendar-nav button:hover,.calendar-month-cell.today{background:#e7f5eb}
+.calendar-month-cell.today .calendar-month-date{color:#158765}
+.mobile-nav{border-color:var(--line)}
+.mobile-nav button.active{color:#247b59}
+.mobile-nav .mobile-capture{background:var(--green);color:#e7f7e3}
+
+@media(max-width:780px){
+  .auth-page{display:flex;flex-direction:column;min-height:100dvh}
+  .auth-visual{display:flex;min-height:194px;padding:19px 22px 42px;justify-content:flex-start;gap:24px}
+  .auth-top{font-size:11px}
+  .auth-message{margin:0;max-width:330px}
+  .auth-message h1{font-size:29px;margin:4px 0 8px}
+  .auth-message p{font-size:11px;line-height:1.4;margin:0}
+  .auth-ornament{display:none}
+  .auth-form-wrap{min-height:0;padding:0 18px 20px;margin-top:-30px;align-items:flex-start;position:relative;background:transparent}
+  .auth-form{width:100%;max-width:470px;margin:auto;padding:22px;border-radius:20px}
+  .auth-form h2{font-size:27px;margin:9px 0 7px}
+  .auth-form>.muted{font-size:12px;margin-bottom:17px}
+  .auth-form form{gap:12px}
+  .auth-form input{min-height:42px}
+  .mobile-logo{display:none}
+  .auth-foot{margin-top:19px}
+  .toast{left:12px;right:12px;top:12px}
+}
+@media(max-width:520px){
+  .auth-visual{min-height:183px}
+  .auth-message h1{font-size:26px}
+  .auth-form-wrap{padding-inline:13px}
+  .auth-form{padding:20px}
+  .flow-heading h1,.ask-heading h1{font-size:30px}
+  .sales-settings-title h1{font-size:31px}
+}
