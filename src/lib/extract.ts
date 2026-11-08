@@ -36,8 +36,38 @@ export function parseIST(phrase: string, now=new Date()): string | null {
   const c=result.start;
   return DateTime.fromObject({year:c.get('year')||base.year,month:c.get('month')||base.month,day:c.get('day')||base.day,hour:spoken?.hour??(c.isCertain('hour')?(c.get('hour')??9):9),minute:spoken?.minute??(c.isCertain('minute')?(c.get('minute')??0):0)},{zone}).toUTC().toISO();
 }
+export function templateExtract(transcript: string, now=new Date()): Extraction | null {
+  const clean=transcript.trim();
+  const actionLabel=/\b(?:action|instruction)\s*:?\s+/i.exec(clean);
+  if(!actionLabel) return null;
+  const typeSearch=clean.slice(actionLabel.index+actionLabel[0].length);
+  const typeLabel=/\b(?:type|category)\s*:?\s+/i.exec(typeSearch);
+  if(!typeLabel) return null;
+  const typeStart=actionLabel.index+actionLabel[0].length+typeLabel.index;
+  const whenSearch=clean.slice(typeStart+typeLabel[0].length);
+  const whenLabel=/\b(?:when|due)\s*:?\s+/i.exec(whenSearch);
+  const whenStart=whenLabel?typeStart+typeLabel[0].length+whenLabel.index:clean.length;
+  const prefix=clean.slice(0,actionLabel.index).trim().replace(/[.,;]+$/,'').trim();
+  const nameMatch=prefix?prefix.match(/^(?:name|person)\s*(?::|is)?\s*(.+)$/i):null;
+  if(prefix&&!nameMatch) return null;
+  const rawName=nameMatch?.[1]?.trim()||'';
+  const contactName=/^(guest|none|no name|skip)$/i.test(rawName)?'':rawName;
+  const title=clean.slice(actionLabel.index+actionLabel[0].length,typeStart).trim().replace(/[.,;]+$/,'').trim();
+  const type=clean.slice(typeStart+typeLabel[0].length,whenStart).trim().replace(/[.,;]+$/,'').trim().toLowerCase();
+  const kind=/^(follow[\s-]?up|callback)$/.test(type)?'follow_up':type==='reminder'?'reminder':type==='meeting'?'meeting':null;
+  if(!title||!kind) return null;
+  const when=whenLabel?clean.slice(whenStart+whenLabel[0].length).trim().replace(/[.;]+$/,'').trim():'';
+  const dayContext=when.match(/\b(?:day after tomorrow|tomorrow|today|in \d+ days?|on \w+day)\b/i)?.[0]||'';
+  const times=[...when.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?=\s|$|[.;!?—-])/gi)].map(m=>`${m[1]}:${m[2]||'00'} ${m[3].replace(/\./g,'').toUpperCase()}`);
+  const choices=[...new Set(times)].map(time=>parseIST(`${dayContext} at ${time}`,now)).filter((value):value is string=>!!value);
+  const ambiguous=choices.length>1;
+  const topic=title.match(/\babout\s+(.+)$/i)?.[1]?.trim()||'';
+  return {contactName,topic,summary:clean,actions:[{kind,title,dueAt:ambiguous?null:when?parseIST(when,now):null,timeSpecified:times.length>0||/\bin \d+\s*(hours?|hrs?|minutes?|mins?)\b/i.test(when),timeChoices:ambiguous?choices:undefined}],mode:'Local rules'};
+}
 export function localExtract(transcript: string, now=new Date()): Extraction {
   const clean=transcript.trim();
+  const templated=templateExtract(clean,now);
+  if(templated) return templated;
   const normalized=clean.replace(/\b(Dr|Mr|Mrs|Ms|Prof)\.(?=\s)/gi,'$1');
   const match=normalized.match(/\b(?:spoke (?:to|with)|talked (?:to|with)|met(?: with)?|called|call|meeting(?: with)?|meet with|follow up with)\s+((?:(?:Dr|Mr|Mrs|Ms|Prof)\s+)?[\p{L}'-]+(?:\s+[\p{L}'-]+){0,2}?)(?=\s+(?:on|at|by|about|for|to|tomorrow|today|next|in|and|or)\b|[.,;!?]|$)/iu);
   const candidate=match?.[1]?.trim()||'';
@@ -59,6 +89,8 @@ export function localExtract(transcript: string, now=new Date()): Extraction {
   return {contactName,topic,summary:clean,actions,mode:'Local rules'};
 }
 export async function extract(transcript: string): Promise<Extraction> {
+  const templated=templateExtract(transcript);
+  if(templated) return templated;
   if(!process.env.OPENAI_API_KEY) return localExtract(transcript);
   const response=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_MODEL||'gpt-4.1-mini',max_completion_tokens:700,response_format:{type:'json_object'},messages:[{role:'system',content:`Return only JSON: {"contactName":"","topic":"","summary":"","actions":[]}. Each explicit next step has kind (follow_up, reminder, meeting), short title, dueAt (UTC ISO or null), and timeChoices (UTC ISO array only for conflicting spoken times). A person's name is optional. Extract it only from a person cue such as "meeting Sujay"; a topic after "about" is not a person. Use only stated facts. Do not invent a person, action, date, time, or duration. A discussion without an explicit next step has actions:[]. Keep the summary to one sentence. Interpret relative dates in Asia/Kolkata; now is ${DateTime.now().setZone(zone).toISO()}. For alternatives such as "1 pm or 4 pm", use dueAt:null and timeChoices with both times. Limit actions to 10.`},{role:'user',content:transcript}]})});
   if(!response.ok) throw new Error(`AI request failed (${response.status})`);
