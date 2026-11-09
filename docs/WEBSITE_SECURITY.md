@@ -6,7 +6,7 @@ Status: implemented and locally verified; **not enabled in production**. The own
 
 The owner selected Google reCAPTCHA v3. New app users create an account at https://recall.touchmarkdes.com/app, then sign in to the native Recall app. Existing app sessions/logins do not need a CAPTCHA. The released app's signup request will receive a message directing users to the website after enforcement is enabled. Its existing error text is not a new clickable registration button.
 
-Do not exempt a request because it has a native header, omits Origin, or uses a particular User-Agent. These are forgeable. The server requires a verified CAPTCHA for every registration once enabled.
+Do not exempt a request because it has a native header, omits Origin, or uses a particular User-Agent. These are forgeable. The server requires a verified CAPTCHA for every registration once signup protection is enabled. Existing Google Play review credentials use the ordinary sign-in path; no reviewer bypass exists.
 
 ## Keys: local and Vercel
 
@@ -19,6 +19,7 @@ Use the team's **reCAPTCHA v3 site key and secret-key pair** for the standard Si
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=replace_with_site_key
 RECAPTCHA_SECRET_KEY=replace_with_secret_key
 ABUSE_PROTECTION_ENABLED=false
+RECAPTCHA_SIGNUP_ENABLED=false
 RECAPTCHA_ALLOWED_HOSTNAMES=recall.touchmarkdes.com
 RECAPTCHA_MIN_SCORE=0.5
 ```
@@ -41,14 +42,15 @@ Local development without Supabase uses file-backed SQLite with atomic transacti
 
 ## Activation order
 
-1. Keep `ABUSE_PROTECTION_ENABLED=false` while deploying the source and configuring keys.
+1. Keep both protection flags false while deploying the source and configuring keys.
 2. Run the reviewed counter migration in Supabase. Keep existing server credentials and the Vercel repository connection unchanged.
-3. Redeploy/restart so the new API and public site key are present. `/api/security` should report `captchaRequired:false` before activation.
-4. Set `ABUSE_PROTECTION_ENABLED=true` only after keys and database are ready, then redeploy.
-5. Test real browser website signup on the correct hostname, website/native login, native-header signup rejection, quotas and normal voice/manual saves. Do not run a signup-spam/load test against production users. Use disposable records and clean them up.
-6. Check Google's score distribution and legitimate signup failures; adjust limits/threshold deliberately. Set provider billing/budget alerts where supported.
+3. Redeploy/restart so the latest API and public site key are present. `/api/security` reports `captchaRequired:false` while both flags are false.
+4. **While Google Play review is pending:** set `RECAPTCHA_SIGNUP_ENABLED=true` and leave `ABUSE_PROTECTION_ENABLED=false`, then redeploy. CAPTCHA applies to new account creation only. No new general request/login/AI quota is enforced in this mode. Existing native/reviewer sign-in and task flows use the normal application code.
+5. Test an actual website signup and existing native sign-in. Give Google Play a working existing account in App access; the reviewer should not need to create an account or complete a CAPTCHA.
+6. **After Google review:** set `ABUSE_PROTECTION_ENABLED=true` and redeploy to enable the durable rate/usage controls. Full protection also always requires signup CAPTCHA, even if its separate flag is false. Test quotas and normal voice/manual saves. Do not run a signup-spam/load test against production users.
+7. Check Google's score distribution and legitimate signup failures; adjust limits/threshold deliberately. Set provider billing/budget alerts where supported.
 
-Until these steps are complete, do not say the live site is CAPTCHA protected. If a rollout problem occurs, diagnose configuration/store availability; turning the flag off reopens registration and removes these application quotas. Do not hide that consequence. A whole account-creation outage is not silently bypassed.
+Until real signup testing is complete, do not claim the live integration is verified. Turning ABUSE_PROTECTION_ENABLED off removes the new quotas; signup CAPTCHA stays on if RECAPTCHA_SIGNUP_ENABLED remains true. Turning both flags off reopens registration without CAPTCHA. If a rollout problem occurs, diagnose configuration/store availability rather than silently bypassing verification. A whole account-creation outage is not silently bypassed.
 
 ## Implementation
 
@@ -82,6 +84,7 @@ These are application controls, not full DDoS protection or email verification. 
 
 - `npm run test:security`: nine grouped checks, including low/missing score, wrong hostname/action, provider errors, token revalidation, bounded streaming bodies and durable reservations across two independent processes. Google responses are mocked in these tests.
 - `node scripts/test-security-http.mjs`: isolated localhost HTTP check (never production) with dummy keys, no real provider call and no production environment/account data. Confirms native-header bypass rejection, foreign-Origin rejection, oversized-body rejection, 401 login failures followed by 429/Retry-After. No account is created.
+- `scripts/test-review-access.mjs` tests the normal native sign-in/extraction flow with signup CAPTCHA on and usage limits off in an isolated temporary database: 20 successful sign-ins and 25 extractions, with a synthetic account removed afterward. It does not use actual Google reviewer credentials.
 - Typecheck, extraction regressions and production build must pass before handoff. No claim of real reCAPTCHA completion, live Supabase counter execution or real-browser visual verification until those are separately performed with configured keys.
 
 ## Official references
@@ -98,4 +101,4 @@ These are application controls, not full DDoS protection or email verification. 
 - Local `.env.local` protection is enabled for SQLite development; `http://localhost:3000/api/security` reports CAPTCHA required with a site key present.
 - Production variables are being updated by the owner. CLI write attempts failed/cancelled and did not establish production readiness; no automatic deployment or activation was performed.
 - The owner reported successful migration and SQL verification. Secrets remain server-side; no raw keys are committed.
-- After manually merging the source into the deployment repo, deploy with the production flag false, then set it true and redeploy when ready. Test an actual website signup and native sign-in. Google v3 rejection has no checkbox fallback; legitimate low-score failures may require threshold review/support.
+- After manually merging the latest source into the deployment repo, enable only RECAPTCHA_SIGNUP_ENABLED during Google review. Keep ABUSE_PROTECTION_ENABLED false until review completes; then enable it separately. Test an actual website signup and native sign-in. Google v3 rejection has no checkbox fallback; legitimate low-score failures may require threshold review/support.

@@ -23,5 +23,14 @@
   "applicationDependenciesAdded": 0,
   "nativeAppChanges": false,
   "productionDeploymentAndActivation": "pending owner merge/environment setup",
-  "secretsPrinted": false
+  "secretsPrinted": false,
+  "reviewMode": {
+    "signupCaptcha": true,
+    "usageLimits": false,
+    "usesReviewerBypass": false,
+    "fixture": "isolated synthetic account, not actual reviewer credentials",
+    "nativeLogins": 20,
+    "extractions": 25,
+    "fixtureDeleted": true
+  }
 }

@@ -13,6 +13,11 @@ export function abuseEnabled(){
   if(flag==='true'||flag==='1')return true;
   throw new SecurityError('Security configuration is unavailable. Please retry later.',503);
 }
+export function signupCaptchaEnabled(){
+  const flag=process.env.RECAPTCHA_SIGNUP_ENABLED;
+  if(flag!==undefined&&!['true','false','1','0'].includes(flag))throw new SecurityError('Signup security configuration is unavailable.',503);
+  return abuseEnabled()||flag==='true'||flag==='1';
+}
 function hashSecret(){
   const key=process.env.ABUSE_HASH_SECRET||process.env.SUPABASE_SECRET_KEY||process.env.RECAPTCHA_SECRET_KEY;
   if(key&&key.length>=16)return key;
@@ -46,21 +51,21 @@ export async function protectRequest(req:Request){
   const limits=configuredLimits();await reserve([rule('request',clientAddress(req),limits.requestMinute,60)]);
 }
 export async function protectAuth(req:Request,path:string,body:Record<string,unknown>){
-  if(!abuseEnabled()||!['register','login'].includes(path))return;
-  const limits=configuredLimits(),ip=clientAddress(req),email=String(body.email??'').trim().toLowerCase();
+  if(!['register','login'].includes(path))return;
+  const limited=abuseEnabled(),ip=clientAddress(req),email=String(body.email??'').trim().toLowerCase();
   if(path==='login'){
-    await reserve([rule('login-ip',ip,limits.loginQuarterHour,900),rule('login-id',`${ip}:${email}`,limits.loginIdentityQuarterHour,900)]);
+    if(limited){const limits=configuredLimits();await reserve([rule('login-ip',ip,limits.loginQuarterHour,900),rule('login-id',`${ip}:${email}`,limits.loginIdentityQuarterHour,900)]);}
     return;
   }
-  await reserve([rule('signup-hour',ip,limits.signupHour,3600),rule('signup-day',ip,limits.signupDay,86400)]);
+  if(limited){const limits=configuredLimits();await reserve([rule('signup-hour',ip,limits.signupHour,3600),rule('signup-day',ip,limits.signupDay,86400)]);}
+  if(!signupCaptchaEnabled())return;
   const secret=process.env.RECAPTCHA_SECRET_KEY,siteKey=process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if(!secret||!siteKey)throw new SecurityError('New account security checks are not configured yet. Please retry later. Existing accounts can still sign in.',503);
   const hostnames=(process.env.RECAPTCHA_ALLOWED_HOSTNAMES||'recall.touchmarkdes.com').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
   if(process.env.NODE_ENV!=='production')hostnames.push('localhost','127.0.0.1');
-  // No native-header, missing-Origin or User-Agent exemption. Tokens are required
-  // for every new signup once enabled. Rollout requires the native-flow decision.
+  // No native-header, missing-Origin or User-Agent exemption for registration.
   await validateChallenge(body.captchaToken,{secret,hostnames,minScore:process.env.RECAPTCHA_MIN_SCORE===undefined?0.5:Number(process.env.RECAPTCHA_MIN_SCORE)});
-  await reserve([rule('signup-global','site',limits.signupGlobalDay,86400)]);
+  if(limited){const limits=configuredLimits();await reserve([rule('signup-global','site',limits.signupGlobalDay,86400)]);}
 }
 export async function protectUserBudget(userId:string,path:string){
   if(!abuseEnabled()||!['extract','ask','transcribe'].includes(path))return;
