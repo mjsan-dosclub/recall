@@ -3,8 +3,8 @@
 Prepared 17 November 2026. Bundle ID `com.touchmarkdes.recall`.
 The owner confirmed 1.0.8 (12) is still rejected under Guideline 2.1 and the
 physical-device recording remains outstanding. Keep marketing version 1.0.8;
-build 15 replaces the selected rejected binary. Do not create a 1.0.9 submission
-solely because the shared pubspec currently defaults to Android 1.0.9+13.
+build 15 replaces the selected rejected binary. Do not create a separate iOS version
+solely because the shared pubspec now defaults to Android 1.0.10+16.
 
 ## Included
 

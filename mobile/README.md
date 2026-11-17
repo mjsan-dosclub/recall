@@ -31,6 +31,12 @@ On iOS, notification delivery and speech recognition require tests on a real dev
 
 ## Release setup
 
+Current Android candidate: [1.0.10 (16)](release/CHANGELOG-1.0.10.md), over the
+owner-confirmed Play release 1.0.9 (13). The shared pubspec defaults to Android
+1.0.10+16. The pending iPhone replacement remains 1.0.8 (15), built with explicit
+`--build-name=1.0.8 --build-number=15`; do not use the shared default for that
+rejected-version resubmission.
+
 Android uses the permanent application ID `com.touchmarkdes.recall`. Configure local Android upload signing using `android/key.properties.example`; never commit the keystore or passwords. iPhone uses `com.touchmarkdes.recall` with the configured Touchmark team; signing access must be available on the release Mac. See [iPhone replacement build 15](release/IOS-1.0.8-build15.md) for the current TestFlight/review workflow. Test notification permission, exact alarm handling, reboot rescheduling, native speech recognition, and phone layouts on physical Android and iPhone devices before store distribution. Existing live accounts can sign in against the live API URL through the current session-cookie flow.
 
 ## Version 1.0.1 feedback changes
