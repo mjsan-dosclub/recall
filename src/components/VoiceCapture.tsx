@@ -16,7 +16,7 @@ export default function VoiceCapture({disabled=false,ownerId,language,transcript
   const [recording,setRecording]=useState(false);
   const [working,setWorking]=useState(false);
   const [status,setStatus]=useState(transcriptionConfigured?'Tap the mic. Audio saves on this device before transcription.':'Tap the mic to save audio on this device. You can type the note below.');
-  const [seconds,setSeconds]=useState(0);const [savedRecording,setSavedRecording]=useState('');const latestPreview=useRef('');const stoppedAt=useRef(0);const speechFinalized=useRef<Promise<void>|null>(null);const resolveSpeechEnd=useRef<(()=>void)|null>(null);
+  const [seconds,setSeconds]=useState(0);const latestPreview=useRef('');const stoppedAt=useRef(0);const speechFinalized=useRef<Promise<void>|null>(null);const resolveSpeechEnd=useRef<(()=>void)|null>(null);
   const bars=useRef<(HTMLSpanElement|null)[]>([]);
   const recorder=useRef<MediaRecorder|null>(null);
   const speech=useRef<SpeechPreview|null>(null);
@@ -34,7 +34,7 @@ export default function VoiceCapture({disabled=false,ownerId,language,transcript
   function actualState():VoiceState{return pcm.current?.isRecording||recorder.current?.state==='recording'?'recording':starting.current||processing.current?'processing':'idle'}
   function emitState(){const state=actualState();setRecording(state==='recording');onRecorderState(state)}
   function setProcessing(value:boolean){processing.current=value;setWorking(value);emitState()}
-  useImperativeHandle(controlRef,()=>({start,stop,toggle:async()=>{if(actualState()==='recording')await stop();else if(actualState()==='idle')await start()},leave:()=>{if(starting.current){cancelStart.current=true;pcm.current?.cancel()}else if(actualState()==='recording')void stop()},clear:()=>{if(actualState()!=='idle')return;retryClip.current='';setSavedRecording('');latestPreview.current='';setSeconds(0);setStatus(transcriptionConfigured?'Tap the mic. Audio saves on this device before transcription.':'Tap the mic to save audio on this device. You can type the note below.')},state:actualState}));
+  useImperativeHandle(controlRef,()=>({start,stop,toggle:async()=>{if(actualState()==='recording')await stop();else if(actualState()==='idle')await start()},leave:()=>{if(starting.current){cancelStart.current=true;pcm.current?.cancel()}else if(actualState()==='recording')void stop()},clear:()=>{if(actualState()!=='idle')return;retryClip.current='';latestPreview.current='';setSeconds(0);setStatus(transcriptionConfigured?'Tap the mic. Audio saves on this device before transcription.':'Tap the mic to save audio on this device. You can type the note below.')},state:actualState}));
   useEffect(()=>{languageRef.current=language},[language]);
   useEffect(()=>{
     mounted.current=true;
@@ -52,9 +52,9 @@ export default function VoiceCapture({disabled=false,ownerId,language,transcript
       let completed='',sessionText='',restart=true;
       preview.onresult=event=>{if(actualState()==='idle')return;sessionText=Array.from(event.results).map(result=>result[0]?.transcript||'').join(' ').trim();const text=appendTranscript(completed,sessionText);if(text){latestPreview.current=text;onLiveTranscript(text)}};
       preview.onend=()=>{if(!restart||actualState()!=='recording'){resolveSpeechEnd.current?.();return}completed=appendTranscript(completed,sessionText);sessionText='';try{preview.start()}catch{restart=false;resolveSpeechEnd.current?.()}};
-      preview.onerror=()=>{restart=false;resolveSpeechEnd.current?.();speech.current=null;if(actualState()==='recording')setStatus(`Recording continues. Review live text when you stop, or transcribe the saved audio.`)};
+      preview.onerror=()=>{restart=false;resolveSpeechEnd.current?.();speech.current=null;if(actualState()==='recording')setStatus(`Recording continues. Review live text when you stop. Your saved audio is used if live text is unavailable.`)};
       speech.current=preview;preview.start();
-    }catch{speech.current=null;setStatus(`Recording continues. Review live text when you stop, or transcribe the saved audio.`)}
+    }catch{speech.current=null;setStatus(`Recording continues. Review live text when you stop. Your saved audio is used if live text is unavailable.`)}
   }
 
   function stopMeter(){
@@ -97,7 +97,7 @@ export default function VoiceCapture({disabled=false,ownerId,language,transcript
       }
       retryClip.current='';
       if(mounted.current)onTranscript(final,'service');
-      console.info('recall_voice_timing',{source:automatic?'service-fallback':'service-request',requestToTextMs:Math.round(performance.now()-requestedAt),...(automatic?{stopToTextMs:Math.round(performance.now()-stoppedAt.current)}:{})});
+      console.info('recall_voice_timing',JSON.stringify({source:automatic?'service-fallback':'service-retry',requestToTextMs:Math.round(performance.now()-requestedAt),...(automatic?{stopToTextMs:Math.round(performance.now()-stoppedAt.current)}:{})}));
       setStatus(`Transcript ready via ${provider}. Review and correct the text before saving.`);
     }catch(error){retryClip.current=id;if(mounted.current)onError(error instanceof Error?error.message:String(error));setStatus('Audio is saved on this device. Recall will retry when you reconnect; you can also edit the text below.');}
     finally{setProcessing(false)}
@@ -109,19 +109,18 @@ export default function VoiceCapture({disabled=false,ownerId,language,transcript
       const id=crypto.randomUUID();
       await saveLocalClip({id,ownerId,blob,recordedAt:new Date().toISOString(),language:languageRef.current});
       if(!mounted.current)return;
-      setSavedRecording(id);
       if(speechFinalized.current)await Promise.race([speechFinalized.current,new Promise(resolve=>setTimeout(resolve,200))]);
       if(!mounted.current)return;
       if(latestPreview.current.trim()){
         onTranscript(latestPreview.current.trim(),'live');setProcessing(false);
-        console.info('recall_voice_timing',{source:'live',stopToTextMs:Math.round(performance.now()-stoppedAt.current)});
-        setStatus('Live text ready. Recording saved. Review details, or request another transcription if needed.');
+        console.info('recall_voice_timing',JSON.stringify({source:'live',stopToTextMs:Math.round(performance.now()-stoppedAt.current)}));
+        setStatus('Live text ready. Recording saved. Review the words and details before saving.');
       }else{setStatus('Saved on this device.');await transcribe(id,true);}
     }catch(error){if(mounted.current){onError(error instanceof Error?error.message:String(error));setStatus('Recording could not be saved. Please try again.');setProcessing(false)}}
   }
   async function start(){
     if(disabled||actualState()!=='idle')return;
-    latestPreview.current='';speechFinalized.current=null;setSavedRecording('');starting.current=true;cancelStart.current=false;setWorking(true);emitState();onLiveTranscript('');
+    retryClip.current='';latestPreview.current='';speechFinalized.current=null;starting.current=true;cancelStart.current=false;setWorking(true);emitState();onLiveTranscript('');
     const ios=isIosDevice(navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
     if(!navigator.mediaDevices?.getUserMedia||(!ios&&typeof MediaRecorder==='undefined')){starting.current=false;setWorking(false);emitState();onError('Audio recording is unavailable in this browser.');return}
     try{
@@ -157,9 +156,9 @@ export default function VoiceCapture({disabled=false,ownerId,language,transcript
   }
   return <div className={`capture-card voice-capture ${recording?'is-recording':''}`}>
     <button className={`mic-button ${recording?'recording':''}`} onClick={recording?stop:start} disabled={working||disabled} aria-label={recording?'Stop recording':'Start recording'}>{recording?<Square size={27} fill="currentColor"/>:<Mic size={31}/>}</button>
-    <strong>{recording?`Recording · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} / 1:00`:working?'Processing your recording…':'Record a voice note · 0:00 / 1:00'}</strong>
+    <strong>{recording?`Recording · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} / 1:00`:working?'Processing your recording…':`Record a voice note · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} / 1:00`}</strong>
     <span role="status">{status}</span>
     <div className="live-wave" aria-label={recording?'Live microphone level':'Microphone is idle'}>{Array.from({length:BAR_COUNT},(_,i)=><span key={i} ref={element=>{bars.current[i]=element}}/>)}</div>
-    {transcriptionConfigured&&<small className="voice-provider">Live words are kept · {provider} is available for recorded audio</small>}{savedRecording&&transcriptionConfigured&&<button className="secondary" disabled={working||recording||disabled} onClick={()=>void transcribe(savedRecording)}>Transcribe saved audio with {provider}</button>}
+    {transcriptionConfigured&&<small className="voice-provider">Live words are kept · {provider} is available for recorded audio</small>}
   </div>;
 }
